@@ -12,7 +12,7 @@ async function run() {
     const files = core.getInput('files')
     core.debug(`Received files glob pattern: ${files}`)
     const globber = glob.create(files)
-    const tableData = []
+    const tableData = Array()
     const tableHeader = [
       { data: 'File', header: true },
       { data: 'Diagnostic', header: true }
@@ -24,11 +24,15 @@ async function run() {
       core.info(rx.toString())
       const status = await redos(rx.toString(), '')
       core.info(status)
-      const tableRow = [{ data: file }, { data: status }]
-      tableData.push([tableRow])
+      const tableRow = [`${file}`, `${status}`]
+      tableData.push(tableRow)
       core.endGroup()
     }
-    core.summary.addTable(tableData)
+    core.info(tableData.toString())
+    await core.summary
+      .addHeading('ReDOS Test Results')
+      .addTable(tableData)
+      .write()
     // core.setOutput('outputKey', 'outputVal');
   } catch (error) {
     // Fail the workflow run if an error occurs
