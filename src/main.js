@@ -1,5 +1,7 @@
 const core = require('@actions/core')
-const { wait } = require('./wait')
+const glob = require('@actions/glob')
+const fs = require('fs')
+const { redos } = require('./redos')
 
 /**
  * The main function for the action.
@@ -7,18 +9,27 @@ const { wait } = require('./wait')
  */
 async function run() {
   try {
-    const ms = core.getInput('milliseconds', { required: true })
-
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
-
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
-
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    const files = core.getInput('files')
+    core.debug(`Received files glob pattern: ${files}`)
+    const globber = glob.create(files)
+    const tableData = []
+    const tableHeader = [
+      { data: 'File', header: true },
+      { data: 'Diagnostic', header: true }
+    ]
+    tableData.push([tableHeader])
+    for await (const file of (await globber).globGenerator()) {
+      core.startGroup(file)
+      const rx = await fs.promises.readFile(file, 'utf8')
+      core.info(rx.toString())
+      const status = await redos(rx.toString(), '')
+      core.info(status)
+      const tableRow = [{ data: file }, { data: status }]
+      tableData.push([tableRow])
+      core.endGroup()
+    }
+    core.summary.addTable(tableData)
+    // core.setOutput('outputKey', 'outputVal');
   } catch (error) {
     // Fail the workflow run if an error occurs
     core.setFailed(error.message)

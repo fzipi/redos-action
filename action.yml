@@ -1,18 +1,17 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'ReDOS Checker Action'
+description: 'Check for ReDOS in a list of Regular Expressions'
+author: 'CRS Project'
 
 # Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
+  files:
+    description: 'Files to check. Enter a glob pattern like "compiled/*".'
     required: true
-    default: '1000'
 
 # Define your outputs here.
 outputs:
-  time:
-    description: 'Your output description here'
+  vulnerable:
+    description: 'A boolean indicating if the input was vulnerable'
 
 runs:
   using: node20
