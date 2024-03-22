@@ -2,32 +2,32 @@
  * Unit tests for the action's main functionality, src/main.js
  */
 const core = require('@actions/core')
-const glob = require('@actions/glob')
 const main = require('../src/main')
+const mockfs = require('mock-fs')
 
 // Mock the GitHub Actions core library
 const debugMock = jest.spyOn(core, 'debug').mockImplementation()
 const getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
 const setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
-const setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
+const startGroupMock = jest.spyOn(core, 'startGroup').mockImplementation()
 const summaryTableMock = jest
   .spyOn(core.summary, 'addTable')
   .mockImplementation()
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
-const globMock = jest.spyOn(glob, 'create').mockImplementation()
-//jest.mock('fs')
 
-const MOCK_FILE_INFO = {
-  'compiled/921100': 'DATA',
-  'compiled/934500': 'VULN'
-}
 describe('action', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    globMock.mockReturnValue(Object.keys(MOCK_FILE_INFO))
-    //require('fs').__setMockFiles(MOCK_FILE_INFO)
+    mockfs({
+      'compiled/921100': 'DATA', // safe
+      'compiled/934500': '^(a|a)*$' // vulnerable
+    })
+  })
+
+  afterEach(() => {
+    mockfs.restore()
   })
 
   it('sets the files output', async () => {
@@ -35,7 +35,7 @@ describe('action', () => {
     getInputMock.mockImplementation(name => {
       switch (name) {
         case 'files':
-          return 'compiled/**'
+          return 'compiled/*'
         default:
           return ''
       }
@@ -47,17 +47,26 @@ describe('action', () => {
     // Verify that all of the core library functions were called correctly
     expect(debugMock).toHaveBeenNthCalledWith(
       1,
-      'Received files glob pattern: compiled/**'
+      'Received files glob pattern: compiled/*'
     )
-    // expect(summaryTableMock).toHaveBeenNthCalledWith(
-    //   1,
-    //   [[[{"data": "File", "header": true}, {"data": "Diagnostic", "header": true}]]]
-    // )
-    // expect(setOutputMock).toHaveBeenNthCalledWith(
-    //   1,
-    //   'response',
-    //   expect.stringMatching('vulnerable')
-    // )
+    const path = process.cwd()
+    expect(startGroupMock).toHaveBeenNthCalledWith(1, `${path}/compiled/921100`)
+    expect(summaryTableMock).toHaveBeenNthCalledWith(1, [
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true }
+        ]
+      ],
+      [
+        '921100',
+        ':white_check_mark: Safe regular expression. Complexity: safe'
+      ],
+      [
+        '934500',
+        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: 'a'.repeat(31) + '\\x00'"
+      ]
+    ])
   })
 
   it('sets a failed status', async () => {
@@ -74,12 +83,6 @@ describe('action', () => {
 
     await main.run()
     expect(runMock).toHaveReturned()
-
-    // Verify that all of the core library functions were called correctly
-    // expect(setFailedMock).toHaveBeenNthCalledWith(
-    //   1,
-    //   'patterns.split is not a function'
-    // )
   })
 
   it('fails if no input is provided', async () => {

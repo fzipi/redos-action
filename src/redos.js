@@ -7,11 +7,9 @@ const { check } = require('recheck')
  *
  * @param {string} regex The regular expression.
  * @param {string} flags The regular expression flags (TODO).
- * @returns {Promise<String>} status: "vulnerable", "safe" or "undefined"
  */
 async function redos(regex, flags) {
-  const response = await check(regex, flags)
-  return response.status
+  return await check(regex, flags)
 }
 
 module.exports = { redos }

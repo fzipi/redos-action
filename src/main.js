@@ -21,10 +21,21 @@ async function run() {
     for await (const file of (await globber).globGenerator()) {
       core.startGroup(file)
       const rx = await fs.promises.readFile(file, 'utf8')
-      core.info(rx.toString())
-      const status = await redos(rx.toString(), '')
-      core.info(status)
-      const tableRow = [`${file}`, `${status}`]
+      const response = await redos(rx.toString(), '')
+      const filename = file.split('/').pop()
+      let text = ''
+      switch (response.status) {
+        case 'vulnerable':
+          text = `:bomb: Vulnerable regular expression. Complexity: ${response.complexity.type}. Attack pattern: ${response.attack.pattern}`
+          break
+        case 'safe':
+          text = `:white_check_mark: Safe regular expression. Complexity: ${response.complexity.type}`
+          break
+        default:
+          text = `:question: Unknown regular expression status: ${response.status}`
+          break
+      }
+      const tableRow = [`${filename}`, `${text}`]
       tableData.push(tableRow)
       core.endGroup()
     }
