@@ -67,8 +67,8 @@ describe('action', () => {
       ],
       [
         '934500',
-        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: `'a'.repeat(31) + '\\x00'`",
-        'Hotspots detected: "^(\u001B[41ma\u001B[49m|\u001B[41ma\u001B[49m)*$"'
+        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: **'a'.repeat(31) + '\\x00'**",
+        'Hotspots detected: "^(**a**|**a**)*$"'
       ]
     ])
     expect(endGroupMock).toHaveBeenNthCalledWith(1)

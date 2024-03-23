@@ -40,7 +40,7 @@ async function run() {
       }
       switch (diagnostics.status) {
         case 'vulnerable':
-          text = `:bomb: Vulnerable regular expression. Complexity: ${diagnostics.complexity.type}. Attack pattern: \`${diagnostics.attack.pattern}\``
+          text = `:bomb: Vulnerable regular expression. Complexity: ${diagnostics.complexity.type}. Attack pattern: **${diagnostics.attack.pattern}**`
           for (const { start, end, temperature } of diagnostics.hotspot) {
             if (index < start) {
               spots.push(`${diagnostics.source.substring(index, start)}`)
@@ -48,8 +48,8 @@ async function run() {
             let openStyle = ''
             let closeStyle = ''
             if (temperature === 'heat') {
-              openStyle = `\u001B[41m`
-              closeStyle = `\u001B[49m`
+              openStyle = `**`
+              closeStyle = `**`
             }
             spots.push(
               `${openStyle}${diagnostics.source.substring(start, end)}${closeStyle}`
