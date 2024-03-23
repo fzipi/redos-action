@@ -15,31 +15,64 @@ async function run() {
     const tableData = Array()
     const tableHeader = [
       { data: 'File', header: true },
-      { data: 'Diagnostic', header: true }
+      { data: 'Diagnostic', header: true },
+      { data: 'Comments', header: true }
     ]
     tableData.push([tableHeader])
     for await (const file of (await globber).globGenerator()) {
       core.startGroup(file)
       const rx = await fs.promises.readFile(file, 'utf8')
-      const response = await redos(rx.toString(), '')
+      // get flags from file. regular expression to get them: /'^\(\?([dgimsuvy]+)\)'/
+      const flags = rx.match(/^\(\?([dgimsuvy]+)\)/)?.[1] || ''
+      const diagnostics = await redos(rx.toString(), flags)
       const filename = file.split('/').pop()
       let text = ''
-      switch (response.status) {
+      let comments = ''
+      let index = 0
+      const spots = []
+      if (diagnostics === undefined) {
+        text = `:question: Error while checking regular expression`
+        comments = ``
+        const tableRow = [`${filename}`, `${text}`, `${comments}`]
+        tableData.push(tableRow)
+        core.endGroup()
+        continue
+      }
+      switch (diagnostics.status) {
         case 'vulnerable':
-          text = `:bomb: Vulnerable regular expression. Complexity: ${response.complexity.type}. Attack pattern: ${response.attack.pattern}`
+          text = `:bomb: Vulnerable regular expression. Complexity: ${diagnostics.complexity.type}. Attack pattern: \`${diagnostics.attack.pattern}\``
+          for (const { start, end, temperature } of diagnostics.hotspot) {
+            if (index < start) {
+              spots.push(`${diagnostics.source.substring(index, start)}`)
+            }
+            let openStyle = ''
+            let closeStyle = ''
+            if (temperature === 'heat') {
+              openStyle = `\u001B[41m`
+              closeStyle = `\u001B[49m`
+            }
+            spots.push(
+              `${openStyle}${diagnostics.source.substring(start, end)}${closeStyle}`
+            )
+            index = end
+          }
+          if (index < diagnostics.source.length) {
+            spots.push(`${diagnostics.source.substring(index)}`)
+          }
+          comments = `Hotspots detected: "${spots.join('')}"`
           break
         case 'safe':
-          text = `:white_check_mark: Safe regular expression. Complexity: ${response.complexity.type}`
+          text = `:white_check_mark: Safe regular expression. Complexity: ${diagnostics.complexity.type}`
           break
         default:
-          text = `:question: Unknown regular expression status: ${response.status}`
+          text = `:question: Unknown regular expression status: ${diagnostics.status}`
+          comments = `Error Message: ${diagnostics.error.kind}`
           break
       }
-      const tableRow = [`${filename}`, `${text}`]
+      const tableRow = [`${filename}`, `${text}`, `${comments}`]
       tableData.push(tableRow)
       core.endGroup()
     }
-    core.info(tableData.toString())
     await core.summary
       .addHeading('ReDOS Test Results')
       .addTable(tableData)

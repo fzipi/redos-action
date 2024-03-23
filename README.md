@@ -11,7 +11,8 @@ Each file must have a single regular expression per line.
 
 ### `files`
 
-A list of files to check for ReDOS vulnerabilities. It is required, and should be used as glob pattern.
+A list of files to check for ReDOS vulnerabilities. It is required, and should
+be used as glob pattern.
 
 Example: `compiled/*`
 
@@ -29,7 +30,9 @@ steps:
 
   - name: Compiled files
     id: compiled
-    run: echo "a{1,1000}b" > compiled/file1.txt && echo "a{1,1000}b" > compiled/file2.txt
+    run:
+      echo "a{1,1000}b" > compiled/file1.txt && echo "a{1,1000}b" >
+      compiled/file2.txt
 
   - name: Run ReDOS Action
     id: redos
@@ -40,4 +43,5 @@ steps:
 
 ## License
 
-The scripts and documentation in this project are released under the [MIT License](LICENSE)
+The scripts and documentation in this project are released under the
+[MIT License](LICENSE)

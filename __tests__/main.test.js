@@ -10,6 +10,7 @@ const debugMock = jest.spyOn(core, 'debug').mockImplementation()
 const getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
 const setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
 const startGroupMock = jest.spyOn(core, 'startGroup').mockImplementation()
+const endGroupMock = jest.spyOn(core, 'endGroup').mockImplementation()
 const summaryTableMock = jest
   .spyOn(core.summary, 'addTable')
   .mockImplementation()
@@ -55,18 +56,22 @@ describe('action', () => {
       [
         [
           { data: 'File', header: true },
-          { data: 'Diagnostic', header: true }
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
         ]
       ],
       [
         '921100',
-        ':white_check_mark: Safe regular expression. Complexity: safe'
+        ':white_check_mark: Safe regular expression. Complexity: safe',
+        ''
       ],
       [
         '934500',
-        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: 'a'.repeat(31) + '\\x00'"
+        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: `'a'.repeat(31) + '\\x00'`",
+        'Hotspots detected: "^(\u001B[41ma\u001B[49m|\u001B[41ma\u001B[49m)*$"'
       ]
     ])
+    expect(endGroupMock).toHaveBeenNthCalledWith(1)
   })
 
   it('sets a failed status', async () => {
