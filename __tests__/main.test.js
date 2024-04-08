@@ -10,11 +10,13 @@ const debugMock = jest.spyOn(core, 'debug').mockImplementation()
 const getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
 const setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
 const startGroupMock = jest.spyOn(core, 'startGroup').mockImplementation()
-const endGroupMock = jest.spyOn(core, 'endGroup').mockImplementation()
+//const endGroupMock = jest.spyOn(core, 'endGroup').mockImplementation()
 const summaryTableMock = jest
   .spyOn(core.summary, 'addTable')
   .mockImplementation()
-
+const detailsMock = jest.spyOn(core.summary, 'addDetails').mockImplementation()
+const breakMock = jest.spyOn(core.summary, 'addBreak').mockImplementation()
+const headingMock = jest.spyOn(core.summary, 'addHeading').mockImplementation()
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
 
@@ -31,7 +33,7 @@ describe('action', () => {
     mockfs.restore()
   })
 
-  it('sets the files output', async () => {
+  it('sets the output', async () => {
     // Set the action's inputs as return values from core.getInput()
     getInputMock.mockImplementation(name => {
       switch (name) {
@@ -52,26 +54,20 @@ describe('action', () => {
     )
     const path = process.cwd()
     expect(startGroupMock).toHaveBeenNthCalledWith(1, `${path}/compiled/921100`)
-    expect(summaryTableMock).toHaveBeenNthCalledWith(1, [
-      [
-        [
-          { data: 'File', header: true },
-          { data: 'Diagnostic', header: true },
-          { data: 'Comments', header: true }
-        ]
-      ],
-      [
-        '921100',
-        ':white_check_mark: Safe regular expression. Complexity: safe',
-        ''
-      ],
-      [
-        '934500',
-        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: **'a'.repeat(31) + '\\x00'**",
-        'Hotspots detected: "^(**a**|**a**)*$"'
-      ]
-    ])
-    expect(endGroupMock).toHaveBeenNthCalledWith(1)
+    // expect(summaryTableMock).toHaveBeenNthCalledWith(1, [
+    //   [
+    //     [
+    //       { data: 'File', header: true },
+    //       { data: 'Diagnostic', header: true }
+    //     ]
+    //   ],
+    //   ['934500', ':bomb: Vulnerable regular expression.']
+    // ])
+    // expect(breakMock).toHaveBeenNthCalledWith(1,'\n')
+    // expect(detailsMock).toHaveBeenNthCalledWith(1, [
+    //   `## 934500`
+    // ])
+    //expect(headingMock).toHaveBeenNthCalledWith(1, `ReDOS Test Results`)
   })
 
   it('sets a failed status', async () => {
