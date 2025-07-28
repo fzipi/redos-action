@@ -13,10 +13,22 @@ const startGroupMock = jest.spyOn(core, 'startGroup').mockImplementation()
 const endGroupMock = jest.spyOn(core, 'endGroup').mockImplementation()
 const summaryTableMock = jest
   .spyOn(core.summary, 'addTable')
-  .mockImplementation()
+  .mockImplementation(() => core.summary)
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
+
+// Add summary mocks for chaining
+const summaryAddHeadingMock = jest
+  .spyOn(core.summary, 'addHeading')
+  .mockImplementation(() => core.summary)
+const summaryWriteMock = jest
+  .spyOn(core.summary, 'write')
+  .mockImplementation()
+
+// Mock the redos module
+jest.mock('../src/redos')
+const { redos } = require('../src/redos')
 
 describe('action', () => {
   beforeEach(() => {
@@ -24,6 +36,28 @@ describe('action', () => {
     mockfs({
       'compiled/921100': 'DATA', // safe
       'compiled/934500': '^(a|a)*$' // vulnerable
+    })
+    
+    // Default mock implementation for redos
+    redos.mockImplementation(async (regex, flags) => {
+      if (regex === 'DATA') {
+        return {
+          status: 'safe',
+          complexity: { type: 'safe' }
+        }
+      } else if (regex === '^(a|a)*$') {
+        return {
+          status: 'vulnerable',
+          complexity: { type: 'exponential' },
+          attack: { pattern: "'a'.repeat(31) + '\\x00'" },
+          hotspot: [
+            { start: 2, end: 3, temperature: 'heat' },
+            { start: 4, end: 5, temperature: 'heat' }
+          ],
+          source: '^(a|a)*$'
+        }
+      }
+      return { status: 'safe', complexity: { type: 'safe' } }
     })
   })
 
@@ -72,6 +106,129 @@ describe('action', () => {
       ]
     ])
     expect(endGroupMock).toHaveBeenNthCalledWith(1)
+  })
+
+  it('handles undefined diagnostics from redos function', async () => {
+    mockfs({
+      'compiled/error-regex': 'invalid[regex'
+    })
+
+    // Mock redos to return undefined for error case
+    redos.mockImplementation(async () => undefined)
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/error-regex'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      [
+        'error-regex',
+        ':question: Error while checking regular expression',
+        ''
+      ]
+    ])
+  })
+
+  it('handles unknown diagnostic status', async () => {
+    mockfs({
+      'compiled/unknown-status': 'some-regex'
+    })
+
+    // Mock redos to return unknown status
+    redos.mockImplementation(async () => ({
+      status: 'unknown-status',
+      error: { kind: 'unexpected error' }
+    }))
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/unknown-status'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      [
+        'unknown-status',
+        ':question: Unknown regular expression status: unknown-status',
+        'Error Message: unexpected error'
+      ]
+    ])
+  })
+
+  it('generates correct table format for GitHub Actions summary', async () => {
+    mockfs({
+      'compiled/test-file': '^(a|a)*$'
+    })
+
+    // Mock redos to return vulnerable result
+    redos.mockImplementation(async () => ({
+      status: 'vulnerable',
+      complexity: { type: 'exponential' },
+      attack: { pattern: "'a'.repeat(31) + '\\x00'" },
+      hotspot: [
+        { start: 2, end: 3, temperature: 'heat' },
+        { start: 4, end: 5, temperature: 'normal' }
+      ],
+      source: '^(a|a)*$'
+    }))
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/test-file'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    // Verify the table structure matches @actions/core expected format
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        // First row should be header with objects containing data and header: true
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      // Subsequent rows should be arrays of strings
+      [
+        'test-file',
+        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: **'a'.repeat(31) + '\\x00'**",
+        'Hotspots detected: "^(**a**|a)*$"'
+      ]
+    ])
   })
 
   it('sets a failed status', async () => {
