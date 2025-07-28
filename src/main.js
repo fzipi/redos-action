@@ -31,7 +31,7 @@ async function run() {
       let index = 0
       const spots = []
       if (diagnostics === undefined) {
-        text = `:question: Error while checking regular expression`
+        text = `:question: **Error while checking regular expression**`
         comments = ``
         const tableRow = [`${filename}`, `${text}`, `${comments}`]
         tableData.push(tableRow)
@@ -40,7 +40,7 @@ async function run() {
       }
       switch (diagnostics.status) {
         case 'vulnerable':
-          text = `:bomb: Vulnerable regular expression. Complexity: ${diagnostics.complexity.type}. Attack pattern: **${diagnostics.attack.pattern}**`
+          text = `:bomb: **Vulnerable** regular expression. Complexity: \`${diagnostics.complexity.type}\`. Attack pattern: \`${diagnostics.attack.pattern}\``
           for (const { start, end, temperature } of diagnostics.hotspot) {
             if (index < start) {
               spots.push(`${diagnostics.source.substring(index, start)}`)
@@ -48,8 +48,11 @@ async function run() {
             let openStyle = ''
             let closeStyle = ''
             if (temperature === 'heat') {
-              openStyle = `**`
-              closeStyle = `**`
+              openStyle = `🔥**`
+              closeStyle = `**🔥`
+            } else {
+              openStyle = `⚠️**`
+              closeStyle = `**⚠️`
             }
             spots.push(
               `${openStyle}${diagnostics.source.substring(start, end)}${closeStyle}`
@@ -59,14 +62,37 @@ async function run() {
           if (index < diagnostics.source.length) {
             spots.push(`${diagnostics.source.substring(index)}`)
           }
-          comments = `Hotspots detected: "${spots.join('')}"`
+          comments = `🎯 **Hotspots detected:** \`${spots.join('')}\``
           break
         case 'safe':
-          text = `:white_check_mark: Safe regular expression. Complexity: ${diagnostics.complexity.type}`
+          text = `:white_check_mark: **Safe** regular expression. Complexity: \`${diagnostics.complexity.type}\``
+          break
+        case 'error':
+          // Enhanced error handling with detailed diagnostics
+          const errorInfo = diagnostics.error
+          const diagnosticsInfo = diagnostics.diagnostics
+          
+          if (errorInfo.kind === 'timeout') {
+            text = `:alarm_clock: **Analysis Timeout** - Pattern too complex to analyze safely`
+            const suggestions = errorInfo.suggestions.slice(0, 3).join(' • ')
+            const complexityInfo = diagnosticsInfo ? 
+              `Risk: \`${diagnosticsInfo.estimatedRisk}\`, Indicators: \`${diagnosticsInfo.complexityIndicators.join(', ')}\`` : 
+              'Complexity analysis unavailable'
+            comments = `⚠️ **Timeout Details:** ${errorInfo.details} **Suggestions:** ${suggestions} **${complexityInfo}**`
+          } else if (errorInfo.kind === 'memory_exceeded') {
+            text = `:bangbang: **Memory Exceeded** - Pattern requires too much memory to analyze`
+            comments = `💾 **Memory Issue:** ${errorInfo.details} **Suggestions:** ${errorInfo.suggestions.slice(0, 2).join(' • ')}`
+          } else if (errorInfo.kind === 'parse_error') {
+            text = `:x: **Syntax Error** - Invalid regular expression`
+            comments = `🔍 **Parse Error:** ${errorInfo.details} **Suggestions:** ${errorInfo.suggestions.slice(0, 2).join(' • ')}`
+          } else {
+            text = `:warning: **Analysis Error** - \`${errorInfo.kind}\``
+            comments = `❌ **Error:** ${errorInfo.message} **Details:** ${errorInfo.details}`
+          }
           break
         default:
-          text = `:question: Unknown regular expression status: ${diagnostics.status}`
-          comments = `Error Message: ${diagnostics.error.kind}`
+          text = `:question: **Unknown** regular expression status: \`${diagnostics.status}\``
+          comments = `❌ **Error:** \`${diagnostics.error?.kind || 'unknown'}\``
           break
       }
       const tableRow = [`${filename}`, `${text}`, `${comments}`]

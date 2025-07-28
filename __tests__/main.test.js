@@ -96,13 +96,13 @@ describe('action', () => {
       ],
       [
         '921100',
-        ':white_check_mark: Safe regular expression. Complexity: safe',
+        ':white_check_mark: **Safe** regular expression. Complexity: `safe`',
         ''
       ],
       [
         '934500',
-        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: **'a'.repeat(31) + '\\x00'**",
-        'Hotspots detected: "^(**a**|**a**)*$"'
+        ":bomb: **Vulnerable** regular expression. Complexity: `exponential`. Attack pattern: `'a'.repeat(31) + '\\x00'`",
+        '🎯 **Hotspots detected:** `^(🔥**a**🔥|🔥**a**🔥)*$`'
       ]
     ])
     expect(endGroupMock).toHaveBeenNthCalledWith(1)
@@ -138,8 +138,217 @@ describe('action', () => {
       ],
       [
         'error-regex',
-        ':question: Error while checking regular expression',
+        ':question: **Error while checking regular expression**',
         ''
+      ]
+    ])
+  })
+
+  it('handles enhanced timeout error with diagnostics', async () => {
+    mockfs({
+      'compiled/timeout-regex': '(a+)*b'
+    })
+
+    // Mock redos to return enhanced timeout error
+    redos.mockImplementation(async () => ({
+      status: 'error',
+      error: {
+        kind: 'timeout',
+        message: 'Regex analysis timed out (7 chars)',
+        details: 'The regular expression analysis exceeded the timeout limit. This typically occurs with complex patterns that create exponential search spaces.',
+        suggestions: [
+          'Simplify nested quantifiers (avoid patterns like (a+)* or (a*)+ )',
+          'Reduce overlapping alternations (check for patterns like (a|a)* )',
+          'Consider using atomic groups (?>) to prevent backtracking'
+        ]
+      },
+      diagnostics: {
+        complexityScore: 3,
+        complexityIndicators: ['nested quantifiers'],
+        patternLength: 7,
+        estimatedRisk: 'high'
+      }
+    }))
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/timeout-regex'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      [
+        'timeout-regex',
+        ':alarm_clock: **Analysis Timeout** - Pattern too complex to analyze safely',
+        '⚠️ **Timeout Details:** The regular expression analysis exceeded the timeout limit. This typically occurs with complex patterns that create exponential search spaces. **Suggestions:** Simplify nested quantifiers (avoid patterns like (a+)* or (a*)+ ) • Reduce overlapping alternations (check for patterns like (a|a)* ) • Consider using atomic groups (?>) to prevent backtracking **Risk: `high`, Indicators: `nested quantifiers`**'
+      ]
+    ])
+  })
+
+  it('handles memory exceeded error', async () => {
+    mockfs({
+      'compiled/memory-issue': 'a{1,10000}b{1,10000}'
+    })
+
+    // Mock redos to return memory exceeded error
+    redos.mockImplementation(async () => ({
+      status: 'error',
+      error: {
+        kind: 'memory_exceeded',
+        message: 'Memory limit exceeded during analysis',
+        details: 'The regex pattern requires too much memory to analyze, often due to exponential state space explosion.',
+        suggestions: [
+          'Reduce quantifier ranges (e.g., {1,1000} → {1,50})',
+          'Eliminate redundant patterns',
+          'Use more restrictive anchors (^ and $)',
+          'Pattern has 5 complexity indicators'
+        ]
+      },
+      diagnostics: {
+        complexityScore: 5,
+        complexityIndicators: ['large repetition {1,10000}', 'large repetition {1,10000}'],
+        estimatedRisk: 'high'
+      }
+    }))
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/memory-issue'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      [
+        'memory-issue',
+        ':bangbang: **Memory Exceeded** - Pattern requires too much memory to analyze',
+        '💾 **Memory Issue:** The regex pattern requires too much memory to analyze, often due to exponential state space explosion. **Suggestions:** Reduce quantifier ranges (e.g., {1,1000} → {1,50}) • Eliminate redundant patterns'
+      ]
+    ])
+  })
+
+  it('handles parse error with detailed suggestions', async () => {
+    mockfs({
+      'compiled/parse-error': 'invalid[regex('
+    })
+
+    // Mock redos to return parse error
+    redos.mockImplementation(async () => ({
+      status: 'error',
+      error: {
+        kind: 'parse_error',
+        message: 'Invalid regular expression: Unterminated character class',
+        details: 'The regular expression contains syntax errors that prevent proper parsing.',
+        suggestions: [
+          'Check for unmatched brackets [ ] or parentheses ( )',
+          'Verify escape sequences are correct',
+          'Ensure quantifiers are properly placed'
+        ]
+      },
+      diagnostics: {
+        complexityScore: 0,
+        complexityIndicators: ['low complexity'],
+        estimatedRisk: 'low'
+      }
+    }))
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/parse-error'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      [
+        'parse-error',
+        ':x: **Syntax Error** - Invalid regular expression',
+        '🔍 **Parse Error:** The regular expression contains syntax errors that prevent proper parsing. **Suggestions:** Check for unmatched brackets [ ] or parentheses ( ) • Verify escape sequences are correct'
+      ]
+    ])
+  })
+
+  it('handles unknown error types with generic error handling', async () => {
+    mockfs({
+      'compiled/unknown-error': 'some-regex'
+    })
+
+    // Mock redos to return unknown error type
+    redos.mockImplementation(async () => ({
+      status: 'error',
+      error: {
+        kind: 'network_error',
+        message: 'Connection failed',
+        details: 'Unable to connect to analysis service'
+      },
+      diagnostics: {
+        complexityScore: 1,
+        complexityIndicators: ['low complexity'],
+        estimatedRisk: 'low'
+      }
+    }))
+
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'files':
+          return 'compiled/unknown-error'
+        default:
+          return ''
+      }
+    })
+
+    await main.run()
+    expect(runMock).toHaveReturned()
+
+    expect(summaryTableMock).toHaveBeenCalledWith([
+      [
+        [
+          { data: 'File', header: true },
+          { data: 'Diagnostic', header: true },
+          { data: 'Comments', header: true }
+        ]
+      ],
+      [
+        'unknown-error',
+        ':warning: **Analysis Error** - `network_error`',
+        '❌ **Error:** Connection failed **Details:** Unable to connect to analysis service'
       ]
     ])
   })
@@ -177,8 +386,8 @@ describe('action', () => {
       ],
       [
         'unknown-status',
-        ':question: Unknown regular expression status: unknown-status',
-        'Error Message: unexpected error'
+        ':question: **Unknown** regular expression status: `unknown-status`',
+        '❌ **Error:** `unexpected error`'
       ]
     ])
   })
@@ -225,8 +434,8 @@ describe('action', () => {
       // Subsequent rows should be arrays of strings
       [
         'test-file',
-        ":bomb: Vulnerable regular expression. Complexity: exponential. Attack pattern: **'a'.repeat(31) + '\\x00'**",
-        'Hotspots detected: "^(**a**|a)*$"'
+        ":bomb: **Vulnerable** regular expression. Complexity: `exponential`. Attack pattern: `'a'.repeat(31) + '\\x00'`",
+        '🎯 **Hotspots detected:** `^(🔥**a**🔥|⚠️**a**⚠️)*$`'
       ]
     ])
   })
